@@ -1,16 +1,19 @@
 class Course:
-    def __init__(self, name, desc="", prerequisites=None, incompatible=None, semesters=None):
-        if semesters is None:
-            semesters = ["Fall", "Spring", "Summer"]
+    def __init__(self, course_number, name, semester=None, credits=0, prerequisites=None, corequisites=None, restrictions=None, desc=""):
         if prerequisites is None:
             prerequisites = []
-        if incompatible is None:
-            incompatible = []
-        self.name = name
-        self.desc = desc
+        if corequisites is None:
+            corequisites = []
+        if semester is None:
+            semester = []
+
         self.prerequisites = prerequisites
-        self.incompatible = incompatible
-        self.semesters = semesters
+        self.course_number = course_number
+        self.name = name
+        self.semester = semester
+        self.credits = credits
+        self.restrictions = restrictions
+        self.desc = desc
 
     def __str__(self):
         return self.name
