@@ -85,12 +85,13 @@ def get_courses(html_source):
                 reenroll_info = data
 
             elif descriptor == "Prerequisite:":
-                test = 0
+                prereqs = Conditional(data, 0)
 
             elif descriptor == "Corequisite:":
                 coreqs = data
                 coreqs = coreqs.split(" ")
                 coreqs = " ".join(coreqs[:2])
+                coreqs = Conditional(coreqs, 0)
 
             elif descriptor == "Recommended Background:":
                 recommended_background = data
@@ -99,7 +100,7 @@ def get_courses(html_source):
                 restrictions = data
 
             elif descriptor == "Not open to students with credit in:":
-                not_open_with_credit = data
+                not_open_with_credit = Conditional(data, 0)
 
             elif descriptor == "Description:":
                 description = data
