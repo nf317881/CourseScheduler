@@ -26,6 +26,19 @@ class Course:
     def __repr__(self):
         return self.__str__()
 
+    def check_if_allowed(self, previous_courses, concurrent_courses):
+        allowed = True
+
+        if self.prerequisites is not None:
+            allowed = self.prerequisites.check_if_courses_in(previous_courses)
+
+        if self.corequisites is not None:
+            allowed = self.corequisites.check_if_courses_in(previous_courses)
+
+        if self.restrictions is not None:
+            allowed = not self.restrictions.check_if_courses_in(previous_courses)
+
+        return allowed
 
 
 class Major:
@@ -36,6 +49,16 @@ class Major:
         self.desc = desc
         self.courses = courses
 
+    def check_completed(self, course_list):
+        completed = True
+        courses_not_met = []
+        for course in self.courses:
+            if not course in course_list:
+                completed = False
+                courses_not_met.append(course)
+
+        return [completed, courses_not_met]
+
     def __str__(self):
         return self.name
 
@@ -45,9 +68,19 @@ class Major:
 
 
 class Conditional:
-    def __init__(self, str_cond, math_placement_test_score):
+    def __init__(self, str_cond, placement_test_dict, tier_1_writing_requirement):
         self.str_cond = str_cond
-        self.math_placement_test_score = math_placement_test_score
+        if str_cond == "(CSS 232) Completion of Tier I writing requirement.":
+            str_cond = "CSS 232 and Completion of Tier I writing requirement"
+
+        if type(tier_1_writing_requirement) is not bool:
+            tier_1_writing_requirement = False
+        translation_table = str.maketrans(
+            {"{": "(", "}": ")", ".":""})
+        self.str_cond = str_cond.translate(translation_table)
+        self.str_cond.replace("Completion of Tier I Writing Requirement", str(tier_1_writing_requirement))
+
+        self.math_placement_test_score = placement_test_dict["Math"]
 
         if self.malicious_check():  # str_cond is from the web and we eval later
                                     # if str_cond without (), num, and spaces is not alpha end program
@@ -65,14 +98,24 @@ class Conditional:
                 all_separators.append(index)
 
         courses = []
-        for index, x in enumerate(spaces):
-            all_sep_index = all_separators.index(x)
-            if self.str_cond[x + 1].isdigit():
-                start = all_separators[all_sep_index - 1] + 1
-                end = all_separators[all_sep_index + 1]
-                # 0 is course name, 1 is starting char in str_cond, 2 is end, 3 is if the course should be considered
-                # as concurrent
-                courses.append([self.str_cond[start:end], start, end, False])
+        if len(all_separators) > 1:
+            for index, x in enumerate(spaces):
+                all_sep_index = all_separators.index(x)
+                if self.str_cond[x + 1].isdigit():
+                    if all_sep_index != 0:
+                        start = all_separators[all_sep_index - 1] + 1
+                    else:
+                        start = 0
+
+                    if not all_sep_index == len(all_separators) - 1:
+                        end = all_separators[all_sep_index + 1]
+                    else:
+                        end = len(all_separators) - 1
+                    # 0 is course name, 1 is starting char in str_cond, 2 is end, 3 is if the course should be considered
+                    # as concurrent
+                    courses.append([self.str_cond[start:end], start, end, False])
+        else:
+            courses.append([self.str_cond, 0, len(self.str_cond)-1, False]) #this is for conditions of only 1 course
 
         # if a course is concurrently allowed, create a new class with concurrently allowed
         # this works well because the str_cond is modified to be .eval() later
@@ -147,3 +190,70 @@ class Conditional:
             # math placement test scores are not fractional or otherwise outside Z+
             raise ValueError("Number must be an integer")
 
+
+class Semester():
+    def __init__(self, courses=None, year=1900, season="Fall"):
+        if courses is None or type(courses) is not list or type(courses[0]) is not Course:
+            courses = []
+
+        if type(year) is not int:
+            year = 1900
+
+        if type(season) is not str:
+            season="Fall"
+
+        self.courses = courses
+        self.year = year
+        self.season = season
+
+        if season == "Fall":
+            self.truncated_season = "FA"
+        elif season == "Spring":
+            self.truncated_season = "SP"
+        elif season == "Summer":
+            self.truncated_season = "SU"
+
+    def __str__(self):
+        return f"{self.truncated_season}{str(self.year)[2:]}"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+
+class Schedule():
+    def __init__(self, name, semesters=None, majors=None):
+        if semesters is None or type(semesters) is not list or type(semesters[0]) is not Semester:
+            semesters = []
+        if majors is None or type(majors) is not list or type(majors[0]) is not Major:
+            majors = []
+
+        self.semesters = semesters
+        self.majors = majors
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.__str__()
+
+    def check_majors_completion(self):
+        satisfied_courses = []
+        unsatisfied_courses = []
+        for semester in self.semesters:
+            for course in semester.courses:
+                if course.check_if_allowed(satisfied_courses, semester.courses):
+                    satisfied_courses.append(course)
+                else:
+                    unsatisfied_courses.append(course)
+
+        satisfied_majors = []
+        unsatisfied_majors = []
+        for major in self.majors:
+            if major.check_completed(satisfied_courses):
+                satisfied_majors.append(major)
+            else:
+                unsatisfied_majors.append(major)
+
+        return [satisfied_courses, unsatisfied_courses, satisfied_majors, unsatisfied_majors]
